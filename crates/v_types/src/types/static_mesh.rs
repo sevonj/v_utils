@@ -710,8 +710,11 @@ mod tests {
             if out_buf != input_buf {
                 num_failed += 1;
                 println!("ERR: {path:?}");
-                // println!("exp: {input_buf:?}");
-                // println!("got: {out_buf:?}");
+                println!(
+                    "exp len: {:X}, got len: {:X}",
+                    input_buf.len(),
+                    out_buf.len()
+                );
             }
         }
         println!("num_failed: {num_failed:?}");
