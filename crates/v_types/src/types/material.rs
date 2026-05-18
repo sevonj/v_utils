@@ -40,7 +40,7 @@ impl MaterialsDeserialized {
         }
         let mut materials: Vec<MaterialDeserialized> = material_headers
             .iter()
-            .map(|m| MaterialDeserialized::new(m))
+            .map(MaterialDeserialized::new)
             .collect();
 
         for (material, header) in materials.iter_mut().zip(&material_headers) {
@@ -115,8 +115,8 @@ impl MaterialsDeserialized {
                 });
             }
 
-            material.consts_a_first = a.first_float as u32;
-            material.consts_b_first = b.first_float as u32;
+            material.consts_a_first = a.first_float;
+            material.consts_b_first = b.first_float;
 
             for i in 0..num_vecs_a {
                 let off = start_a + i * 16;
