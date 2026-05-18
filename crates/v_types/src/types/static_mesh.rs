@@ -609,7 +609,7 @@ mod tests {
                 num_success += 1
             }
         }
-        println!("num_failed: {num_failed:?}");
+        println!("num_failed: {num_failed:?} / {NUM_SMESH:?}");
         assert_eq!(num_failed, 0);
         assert_eq!(num_success, NUM_SMESH);
     }
@@ -643,7 +643,7 @@ mod tests {
                 );
             }
         }
-        println!("num_failed: {num_failed:?}");
+        println!("num_failed: {num_failed:?} / {NUM_SMESH:?}");
         assert_eq!(num_failed, 0);
     }
 
@@ -679,7 +679,7 @@ mod tests {
                 // println!("got: {out_buf:?}");
             }
         }
-        println!("num_failed: {num_failed:?}");
+        println!("num_failed: {num_failed:?} / {NUM_SMESH:?}");
         assert_eq!(num_failed, 0);
     }
 
@@ -717,7 +717,7 @@ mod tests {
                 );
             }
         }
-        println!("num_failed: {num_failed:?}");
+        println!("num_failed: {num_failed:?} / {NUM_SMESH:?}");
         assert_eq!(num_failed, 0);
     }
 
@@ -746,7 +746,7 @@ mod tests {
                 num_success += 1
             }
         }
-        println!("num_failed: {num_failed:?}");
+        println!("num_failed: {num_failed:?} / {NUM_CMESH:?}");
         assert_eq!(num_failed, 0);
         assert_eq!(num_success, NUM_CMESH);
     }
