@@ -703,8 +703,8 @@ pub struct MaterialUnknown3 {
     pub unk_00: i32,
     pub unk_04: i32,
     pub num_mat_unk4: u16,
-    pub unk_06: i16,
-    pub ptr_08: i32,
+    pub unk_0a: i16,
+    pub ptr_0c: i32,
 }
 
 impl MaterialUnknown3 {
@@ -723,12 +723,12 @@ impl MaterialUnknown3 {
             });
         }
 
-        let ptr_08 = read_i32_le(buf, 0xc);
-        if ptr_08 != -1 {
+        let ptr_0c = read_i32_le(buf, 0xc);
+        if ptr_0c != -1 {
             return Err(VolitionError::ExpectedExactValue {
-                field: "MaterialBlock::ptr_08",
+                field: "MaterialBlock::ptr_0c",
                 expected: -1,
-                got: ptr_08,
+                got: ptr_0c,
             });
         }
 
@@ -736,8 +736,8 @@ impl MaterialUnknown3 {
             unk_00: read_i32_le(buf, 0x0),
             unk_04: read_i32_le(buf, 0x4),
             num_mat_unk4,
-            unk_06: read_i16_le(buf, 0xa),
-            ptr_08,
+            unk_0a: read_i16_le(buf, 0xa),
+            ptr_0c,
         })
     }
 
@@ -746,7 +746,7 @@ impl MaterialUnknown3 {
         bytes[0x00..0x04].copy_from_slice(&self.unk_00.to_le_bytes());
         bytes[0x04..0x08].copy_from_slice(&self.unk_04.to_le_bytes());
         bytes[0x08..0x0a].copy_from_slice(&self.num_mat_unk4.to_le_bytes());
-        bytes[0x0a..0x0c].copy_from_slice(&self.unk_06.to_le_bytes());
+        bytes[0x0a..0x0c].copy_from_slice(&self.unk_0a.to_le_bytes());
         bytes[0x0c..0x10].copy_from_slice(&(-1_i32).to_le_bytes());
         bytes
     }
