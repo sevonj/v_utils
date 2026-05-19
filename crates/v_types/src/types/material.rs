@@ -6,6 +6,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+use std::collections::HashSet;
 use std::io::Write;
 
 use crate::VolitionError;
@@ -38,6 +39,11 @@ impl MaterialsDeserialized {
             material_headers.push(Material::from_le_unsized(&buf[*data_offset..])?);
             *data_offset += size_of::<Material>();
         }
+        let mut material_ids = HashSet::new();
+        for head in &material_headers {
+            material_ids.insert(head.id);
+        }
+
         let mut materials: Vec<MaterialDeserialized> = material_headers
             .iter()
             .map(MaterialDeserialized::new)
@@ -166,7 +172,14 @@ impl MaterialsDeserialized {
 
         let mut mat_unknown3s = Vec::with_capacity(num_mat_unknown3);
         for _ in 0..num_mat_unknown3 {
-            mat_unknown3s.push(MaterialUnknown3::from_le_unsized(&buf[*data_offset..])?);
+            let unknown3 = MaterialUnknown3::from_le_unsized(&buf[*data_offset..])?;
+            if !material_ids.contains(&unknown3.material_id) {
+                return Err(VolitionError::UnexpectedValue {
+                    desc: "MaterialUnknown3::material_id not found in materials",
+                    got: unknown3.material_id,
+                });
+            }
+            mat_unknown3s.push(unknown3);
             *data_offset += size_of::<MaterialUnknown3>();
         }
 
@@ -460,9 +473,8 @@ impl MaterialsHeader {
 #[repr(C)]
 pub struct MaterialDeserialized {
     /// name checksum?
-    pub shader_hash: i32,
-    /// name checksum?
-    pub material_hash: i32,
+    pub shader: i32,
+    pub id: i32,
     pub flags: i32,
     pub unknown1s: Vec<MaterialUnknown1>,
     pub consts_a_first: u32,
@@ -478,8 +490,8 @@ pub struct MaterialDeserialized {
 impl MaterialDeserialized {
     pub fn new(mat: &Material) -> Self {
         Self {
-            shader_hash: mat.shader_hash,
-            material_hash: mat.material_hash,
+            shader: mat.shader,
+            id: mat.id,
             flags: mat.flags,
             unknown1s: vec![],
             consts_a_first: 0,
@@ -495,8 +507,8 @@ impl MaterialDeserialized {
 
     pub fn to_disk(&self) -> Material {
         Material {
-            shader_hash: self.shader_hash,
-            material_hash: self.material_hash,
+            shader: self.shader,
+            id: self.id,
             flags: self.flags,
             num_unknown: self.unknown1s.len() as u16,
             num_textures: self.textures.len() as u16,
@@ -512,9 +524,8 @@ impl MaterialDeserialized {
 #[repr(C)]
 pub struct Material {
     /// name checksum?
-    pub shader_hash: i32,
-    /// name checksum?
-    pub material_hash: i32,
+    pub shader: i32,
+    pub id: i32,
     pub flags: i32,
     pub num_unknown: u16,
     pub num_textures: u16,
@@ -561,8 +572,8 @@ impl Material {
         } */
 
         Ok(Self {
-            shader_hash: read_i32_le(buf, 0x0),
-            material_hash: read_i32_le(buf, 0x4),
+            shader: read_i32_le(buf, 0x0),
+            id: read_i32_le(buf, 0x4),
             flags: read_i32_le(buf, 0x8),
             num_unknown,
             num_textures: read_u16_le(buf, 0xe),
@@ -574,8 +585,8 @@ impl Material {
 
     pub fn to_le_bytes(&self) -> [u8; size_of::<Self>()] {
         let mut bytes = [0; size_of::<Self>()];
-        bytes[0x00..0x04].copy_from_slice(&self.shader_hash.to_le_bytes());
-        bytes[0x04..0x08].copy_from_slice(&self.material_hash.to_le_bytes());
+        bytes[0x00..0x04].copy_from_slice(&self.shader.to_le_bytes());
+        bytes[0x04..0x08].copy_from_slice(&self.id.to_le_bytes());
         bytes[0x08..0x0c].copy_from_slice(&self.flags.to_le_bytes());
         bytes[0x0c..0x0e].copy_from_slice(&self.num_unknown.to_le_bytes());
         bytes[0x0e..0x10].copy_from_slice(&self.num_textures.to_le_bytes());
@@ -701,7 +712,7 @@ impl MaterialTextureEntry {
 #[repr(C)]
 pub struct MaterialUnknown3 {
     pub unk_00: i32,
-    pub unk_04: i32,
+    pub material_id: i32,
     pub num_mat_unk4: u16,
     pub unk_0a: i16,
     pub ptr_0c: i32,
@@ -734,7 +745,7 @@ impl MaterialUnknown3 {
 
         Ok(Self {
             unk_00: read_i32_le(buf, 0x0),
-            unk_04: read_i32_le(buf, 0x4),
+            material_id: read_i32_le(buf, 0x4),
             num_mat_unk4,
             unk_0a: read_i16_le(buf, 0xa),
             ptr_0c,
@@ -744,7 +755,7 @@ impl MaterialUnknown3 {
     pub fn to_le_bytes(&self) -> [u8; size_of::<Self>()] {
         let mut bytes = [0; size_of::<Self>()];
         bytes[0x00..0x04].copy_from_slice(&self.unk_00.to_le_bytes());
-        bytes[0x04..0x08].copy_from_slice(&self.unk_04.to_le_bytes());
+        bytes[0x04..0x08].copy_from_slice(&self.material_id.to_le_bytes());
         bytes[0x08..0x0a].copy_from_slice(&self.num_mat_unk4.to_le_bytes());
         bytes[0x0a..0x0c].copy_from_slice(&self.unk_0a.to_le_bytes());
         bytes[0x0c..0x10].copy_from_slice(&(-1_i32).to_le_bytes());

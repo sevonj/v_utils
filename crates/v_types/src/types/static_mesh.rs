@@ -309,7 +309,7 @@ impl StaticMesh {
                     if separate_surfaces {
                         out += &format!("o lod_{lod}_surf{i}\n");
                     }
-                    let mat_name = self.matlib.materials[surf.material as usize].material_hash;
+                    let mat_name = self.matlib.materials[surf.material as usize].id;
                     out += &format!("usemtl mat_{mat_name:08X}\n");
 
                     let vhead = &mesh.vertex_headers[surf.vbuf as usize];
@@ -331,7 +331,7 @@ impl StaticMesh {
                     if separate_surfaces {
                         out += &format!("o lod_{lod}_shadow_surf{i}\n");
                     }
-                    let mat_name = self.matlib.materials[surf.material as usize].material_hash;
+                    let mat_name = self.matlib.materials[surf.material as usize].id;
                     out += &format!("usemtl mat_{mat_name:08X}\n");
 
                     let vhead = &shadow_mesh.vertex_headers[surf.vbuf as usize];
