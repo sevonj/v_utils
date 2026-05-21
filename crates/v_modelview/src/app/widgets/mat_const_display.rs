@@ -27,7 +27,7 @@ impl Widget for MatConstDisplay<'_> {
             ui.add(DragValue::new(&mut self.value[2]));
             ui.add(DragValue::new(&mut self.value[3]));
 
-            let mut color = self.value.clone();
+            let mut color = *self.value;
             if ui.color_edit_button_rgba_unmultiplied(&mut color).changed() {
                 *self.value = color;
             }
