@@ -24,7 +24,8 @@ pub const MAX_TEXTURES: u16 = 100;
 pub const MAX_NAVPOINTS: u16 = 100;
 pub const MAX_BONES: u32 = 500;
 
-/// Deserialized cmesh/smesh
+/// Deserialized, structured for editability
+/// "cmesh and smesh share the same structure, called static_mesh (not confusing)"
 #[derive(Debug, Clone)]
 pub struct StaticMesh {
     pub header: StaticMeshHeader,
@@ -496,6 +497,7 @@ pub struct StaticMeshNavpoint {
     /// name to reference nav point by
     pub name: [u8; 64],
     /// vid this navp is attached to.
+    /// Always 0 on disk
     pub vid: i32,
     /// position of navpoint in object coords
     pub pos: Vector,
@@ -510,9 +512,18 @@ impl StaticMeshNavpoint {
     }
 
     pub fn from_le_bytes(buf: &[u8; size_of::<Self>()]) -> Result<Self, VolitionError> {
+        let vid = read_i32_le(buf, 0x40);
+        if vid != 0 {
+            return Err(VolitionError::ExpectedExactValue {
+                field: "StaticMeshNavpoint::vid",
+                expected: 0,
+                got: vid,
+            });
+        }
+
         Ok(Self {
             name: read_bytes(buf, 0x0),
-            vid: read_i32_le(buf, 0x40),
+            vid,
             pos: Vector::from_le_unsized(&buf[0x44..])?,
             orient: Quaternion::from_le_unsized(&buf[0x50..])?,
         })
