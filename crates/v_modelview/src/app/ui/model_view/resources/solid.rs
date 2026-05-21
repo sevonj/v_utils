@@ -6,8 +6,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-use std::collections::HashMap;
-
 use bytemuck::Pod;
 use bytemuck::Zeroable;
 use wgpu::util::DeviceExt;
@@ -23,19 +21,10 @@ pub struct SolidUniforms {
 }
 
 pub struct ShadowMesh {
-    pub vbufs: Vec<wgpu::Buffer>,
+    pub vbuf: wgpu::Buffer,
     pub ibuf: wgpu::Buffer,
     pub surfaces: Vec<v_types::Surface>,
-}
-
-pub const fn shadow_vbuf_layout(
-    vertex_header: &v_types::VertexBuffer,
-) -> wgpu::VertexBufferLayout<'_> {
-    wgpu::VertexBufferLayout {
-        array_stride: vertex_header.stride as wgpu::BufferAddress,
-        step_mode: wgpu::VertexStepMode::Vertex,
-        attributes: &wgpu::vertex_attr_array![0 => Float32x3],
-    }
+    pub has_bones: bool,
 }
 
 pub fn solid_bgl(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -80,9 +69,8 @@ pub fn solid_bind_group(
 
 pub fn shadow_pipelines(
     render_state: &egui_wgpu::RenderState,
-    smesh: &v_types::StaticMesh,
     bgl: &wgpu::BindGroupLayout,
-) -> HashMap<u16, wgpu::RenderPipeline> {
+) -> (wgpu::RenderPipeline, wgpu::RenderPipeline) {
     let device = &render_state.device;
 
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -96,57 +84,79 @@ pub fn shadow_pipelines(
         immediate_size: 0,
     });
 
-    let mut pipelines: HashMap<u16, wgpu::RenderPipeline> = HashMap::new();
-    for mesh in smesh.lod_meshes.iter().filter(|s| s.shadow_mesh.is_some()) {
-        let geometry = mesh.shadow_mesh.as_ref().unwrap();
+    let vertex_none = wgpu::VertexState {
+        module: &shader,
+        entry_point: Some("vs_main"),
+        compilation_options: wgpu::PipelineCompilationOptions::default(),
+        buffers: &[wgpu::VertexBufferLayout {
+            array_stride: 12 as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &wgpu::vertex_attr_array![0 => Float32x3],
+        }],
+    };
 
-        for surf in &geometry.surfaces {
-            if pipelines.contains_key(&surf.material) {
-                continue;
-            }
-            let vertex_header = geometry.vertex_headers.get(surf.vbuf as usize).unwrap();
-            pipelines.insert(
-                surf.material,
-                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("smesh_shadow_pipeline"),
-                    layout: Some(&pipeline_layout),
-                    vertex: wgpu::VertexState {
-                        module: &shader,
-                        entry_point: Some("vs_main"),
-                        compilation_options: wgpu::PipelineCompilationOptions::default(),
-                        buffers: &[shadow_vbuf_layout(vertex_header)],
-                    },
-                    fragment: Some(wgpu::FragmentState {
-                        module: &shader,
-                        entry_point: Some("fs_main"),
-                        compilation_options: wgpu::PipelineCompilationOptions::default(),
-                        targets: &[Some(wgpu::ColorTargetState {
-                            format: render_state.target_format,
-                            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                            write_mask: wgpu::ColorWrites::ALL,
-                        })],
-                    }),
-                    primitive: wgpu::PrimitiveState {
-                        topology: wgpu::PrimitiveTopology::TriangleStrip,
-                        strip_index_format: Some(wgpu::IndexFormat::Uint16),
-                        cull_mode: Some(wgpu::Face::Back),
-                        ..Default::default()
-                    },
-                    depth_stencil: Some(wgpu::DepthStencilState {
-                        format: wgpu::TextureFormat::Depth32Float,
-                        depth_write_enabled: Some(true),
-                        depth_compare: Some(wgpu::CompareFunction::Less),
-                        stencil: wgpu::StencilState::default(),
-                        bias: wgpu::DepthBiasState::default(),
-                    }),
-                    multisample: wgpu::MultisampleState::default(),
-                    multiview_mask: None,
-                    cache: None,
-                }),
-            );
-        }
-    }
-    pipelines
+    let vertex_bone = wgpu::VertexState {
+        module: &shader,
+        entry_point: Some("vs_main"),
+        compilation_options: wgpu::PipelineCompilationOptions::default(),
+        buffers: &[wgpu::VertexBufferLayout {
+            array_stride: 20 as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &wgpu::vertex_attr_array![0 => Float32x3],
+        }],
+    };
+
+    let fragment = Some(wgpu::FragmentState {
+        module: &shader,
+        entry_point: Some("fs_main"),
+        compilation_options: wgpu::PipelineCompilationOptions::default(),
+        targets: &[Some(wgpu::ColorTargetState {
+            format: render_state.target_format,
+            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+            write_mask: wgpu::ColorWrites::ALL,
+        })],
+    });
+
+    let primitive = wgpu::PrimitiveState {
+        topology: wgpu::PrimitiveTopology::TriangleStrip,
+        strip_index_format: Some(wgpu::IndexFormat::Uint16),
+        cull_mode: Some(wgpu::Face::Back),
+        ..Default::default()
+    };
+
+    let depth_stencil = Some(wgpu::DepthStencilState {
+        format: wgpu::TextureFormat::Depth32Float,
+        depth_write_enabled: Some(true),
+        depth_compare: Some(wgpu::CompareFunction::Less),
+        stencil: wgpu::StencilState::default(),
+        bias: wgpu::DepthBiasState::default(),
+    });
+
+    let pipeline_none = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("smesh_shadow_pipeline"),
+        layout: Some(&pipeline_layout),
+        vertex: vertex_none,
+        fragment: fragment.clone(),
+        primitive,
+        depth_stencil: depth_stencil.clone(),
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    });
+
+    let pipeline_bone = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("smesh_shadow_pipeline"),
+        layout: Some(&pipeline_layout),
+        vertex: vertex_bone,
+        fragment,
+        primitive,
+        depth_stencil,
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    });
+
+    (pipeline_none, pipeline_bone)
 }
 
 pub fn shadow_lods(device: &wgpu::Device, smesh: &v_types::StaticMesh) -> Vec<ShadowMesh> {
@@ -157,21 +167,15 @@ pub fn shadow_lods(device: &wgpu::Device, smesh: &v_types::StaticMesh) -> Vec<Sh
         .map(|s| {
             let mesh: &v_types::Mesh = s.shadow_mesh.as_ref().unwrap();
 
-            let mut offset = 0;
-            let vbufs = mesh
-                .vertex_headers
-                .iter()
-                .map(|h| {
-                    let byte_len = h.num_vertices as usize * h.stride as usize;
-                    let slice = &s.shadow_vbuf[offset..offset + byte_len];
-                    offset += byte_len;
-                    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("shadow_vbuf"),
-                        contents: slice,
-                        usage: wgpu::BufferUsages::VERTEX,
-                    })
-                })
-                .collect();
+            let vhead = &mesh.vertex_headers[0];
+
+            let num_bytes = vhead.num_vertices as usize * vhead.stride as usize;
+            let slice = &s.shadow_vbuf[0..num_bytes];
+            let vbuf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("shadow_vbuf"),
+                contents: slice,
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
             let ibuf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("shadow_ibuf"),
@@ -180,9 +184,10 @@ pub fn shadow_lods(device: &wgpu::Device, smesh: &v_types::StaticMesh) -> Vec<Sh
             });
 
             ShadowMesh {
-                vbufs,
+                vbuf,
                 ibuf,
                 surfaces: mesh.surfaces.clone(),
+                has_bones: vhead.has_bones(),
             }
         })
         .collect()

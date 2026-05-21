@@ -30,7 +30,8 @@ pub struct StaticMeshResource {
     // Solid stuff
     solid_uniform_buf: wgpu::Buffer,
     solid_bind_group: wgpu::BindGroup,
-    shadow_pipelines: HashMap<u16, wgpu::RenderPipeline>,
+    solid_pipeline_none: wgpu::RenderPipeline,
+    solid_pipeline_bone: wgpu::RenderPipeline,
     shadow_lods: Vec<solid::ShadowMesh>,
 
     // Wireframe stuff
@@ -64,7 +65,8 @@ impl StaticMeshResource {
 
         let solid_uniform_buf: wgpu::Buffer = solid::solid_uniform_buf(device);
         let solid_bind_group = solid::solid_bind_group(&solid_uniform_buf, &common_bgl, device);
-        let shadow_pipelines = solid::shadow_pipelines(render_state, smesh, &common_bgl);
+        let (solid_pipeline_none, solid_pipeline_bone) =
+            solid::shadow_pipelines(render_state, &common_bgl);
         let shadow_lods = solid::shadow_lods(device, smesh);
 
         let wframe_pipeline = wireframe::wframe_pipeline(render_state);
@@ -77,7 +79,8 @@ impl StaticMeshResource {
             render_lods,
             solid_uniform_buf,
             solid_bind_group,
-            shadow_pipelines,
+            solid_pipeline_none,
+            solid_pipeline_bone,
             shadow_lods,
             wframe_pipeline,
             bbox_vbuf,
@@ -161,11 +164,14 @@ impl CallbackTrait for StaticMeshCallback {
         {
             rpass.set_bind_group(0, &res.solid_bind_group, &[]);
             rpass.set_index_buffer(sub.ibuf.slice(..), wgpu::IndexFormat::Uint16);
+            if sub.has_bones {
+                rpass.set_pipeline(&res.solid_pipeline_bone);
+            } else {
+                rpass.set_pipeline(&res.solid_pipeline_none);
+            }
 
             for surf in &sub.surfaces {
-                let vbuf = &sub.vbufs[surf.vbuf as usize];
-                rpass.set_pipeline(res.shadow_pipelines.get(&surf.material).unwrap());
-                rpass.set_vertex_buffer(0, vbuf.slice(..));
+                rpass.set_vertex_buffer(0, sub.vbuf.slice(..));
                 let indices = surf.start_index..(surf.start_index + surf.num_indices as u32);
                 let base_vertex = surf.start_vertex as i32;
                 rpass.draw_indexed(indices, base_vertex, 0..1);
