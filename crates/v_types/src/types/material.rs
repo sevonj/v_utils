@@ -18,6 +18,7 @@ pub const MAX_UNKNOWN3S: u32 = 2000;
 pub const MAX_UNKNOWN4S: u16 = 50;
 pub const MAX_UKNOWN4_VALUE: usize = 0xffff;
 
+/// Structured for editability
 #[derive(Debug, Clone)]
 pub struct MaterialsDeserialized {
     pub materials: Vec<MaterialDeserialized>,
@@ -469,6 +470,7 @@ impl MaterialsHeader {
     }
 }
 
+/// Structured for editability
 #[derive(Debug, Clone)]
 #[repr(C)]
 pub struct MaterialDeserialized {

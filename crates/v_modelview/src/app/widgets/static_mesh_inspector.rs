@@ -19,6 +19,7 @@ use v_types::StaticMeshNavpoint;
 
 use crate::app::widgets::FloatDisplay;
 use crate::app::widgets::LodMeshInspector;
+use crate::app::widgets::MaterialsInspector;
 use crate::app::widgets::QuatDisplay;
 use crate::app::widgets::VectorDisplay;
 
@@ -80,7 +81,7 @@ impl Widget for StaticMeshInspector<'_> {
             ui.add_space(SPACE);
 
             CollapsingHeader::new("Materials").show(ui, |ui| {
-                ui.label("todo");
+                ui.add(MaterialsInspector::new(smesh));
             });
 
             ui.add_space(SPACE);

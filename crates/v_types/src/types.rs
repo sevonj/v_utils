@@ -16,6 +16,7 @@ mod vector;
 
 pub use aabb::AABB;
 pub use material::Material;
+pub use material::MaterialDeserialized;
 pub use material::MaterialTextureEntry;
 pub use material::MaterialUnknown3;
 pub use material::MaterialsDeserialized;
