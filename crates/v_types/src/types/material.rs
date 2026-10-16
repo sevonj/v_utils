@@ -50,9 +50,9 @@ impl MaterialsDeserialized {
             .map(MaterialDeserialized::new)
             .collect();
 
-        for (material, header) in materials.iter_mut().zip(&material_headers) {
+        for (material, mat_header) in materials.iter_mut().zip(&material_headers) {
             align(data_offset, 4);
-            for _ in 0..header.num_unknown {
+            for _ in 0..mat_header.num_unknown1 {
                 material
                     .unknown1s
                     .push(MaterialUnknown1::from_le_unsized(&buf[*data_offset..])?);
@@ -503,7 +503,7 @@ impl MaterialDeserialized {
             textures: vec![],
             unk_10: mat.unk_10,
             unk_12: mat.unk_12,
-            ptr_14: mat.ptr_14,
+            ptr_14: mat.ptr_unknown1,
         }
     }
 
@@ -512,11 +512,11 @@ impl MaterialDeserialized {
             shader: self.shader,
             id: self.id,
             flags: self.flags,
-            num_unknown: self.unknown1s.len() as u16,
+            num_unknown1: self.unknown1s.len() as u16,
             num_textures: self.textures.len() as u16,
             unk_10: self.unk_10,
             unk_12: self.unk_12,
-            ptr_14: self.ptr_14,
+            ptr_unknown1: self.ptr_14,
         }
     }
 }
@@ -529,11 +529,11 @@ pub struct Material {
     pub shader: i32,
     pub id: i32,
     pub flags: i32,
-    pub num_unknown: u16,
+    pub num_unknown1: u16,
     pub num_textures: u16,
     pub unk_10: i16,
     pub unk_12: i16,
-    pub ptr_14: i32,
+    pub ptr_unknown1: i32,
     /* Could be:
      * - num_constants u8
      * - max_constants u8
@@ -550,20 +550,20 @@ impl Material {
     }
 
     pub fn from_le_bytes(buf: &[u8; size_of::<Self>()]) -> Result<Self, VolitionError> {
-        let num_unknown = read_u16_le(buf, 0xc);
-        let ptr_14 = read_i32_le(buf, 0x14);
+        let num_unknown1 = read_u16_le(buf, 0xc);
+        let ptr_unknown1 = read_i32_le(buf, 0x14);
 
-        if ![0, -1].contains(&ptr_14) {
+        if ![0, -1].contains(&ptr_unknown1) {
             return Err(VolitionError::UnexpectedValue {
                 desc: "Material::ptr_14 should be either 0 or -1",
-                got: ptr_14,
+                got: ptr_unknown1,
             });
         }
 
-        if num_unknown != 0 && ptr_14 != -1 {
+        if num_unknown1 != 0 && ptr_unknown1 != -1 {
             return Err(VolitionError::UnexpectedValue {
-                desc: "Material::ptr_14 should be either -1 ",
-                got: ptr_14,
+                desc: "Material::ptr_unknown1 isn't null when count != 0",
+                got: ptr_unknown1,
             });
         }
         /* else if num_unknown == 0 && ptr_14 != 0 {
@@ -577,11 +577,11 @@ impl Material {
             shader: read_i32_le(buf, 0x0),
             id: read_i32_le(buf, 0x4),
             flags: read_i32_le(buf, 0x8),
-            num_unknown,
+            num_unknown1,
             num_textures: read_u16_le(buf, 0xe),
             unk_10: read_i16_le(buf, 0x10),
             unk_12: read_i16_le(buf, 0x12),
-            ptr_14,
+            ptr_unknown1,
         })
     }
 
@@ -590,11 +590,11 @@ impl Material {
         bytes[0x00..0x04].copy_from_slice(&self.shader.to_le_bytes());
         bytes[0x04..0x08].copy_from_slice(&self.id.to_le_bytes());
         bytes[0x08..0x0c].copy_from_slice(&self.flags.to_le_bytes());
-        bytes[0x0c..0x0e].copy_from_slice(&self.num_unknown.to_le_bytes());
+        bytes[0x0c..0x0e].copy_from_slice(&self.num_unknown1.to_le_bytes());
         bytes[0x0e..0x10].copy_from_slice(&self.num_textures.to_le_bytes());
         bytes[0x10..0x12].copy_from_slice(&self.unk_10.to_le_bytes());
         bytes[0x12..0x14].copy_from_slice(&self.unk_12.to_le_bytes());
-        bytes[0x14..0x18].copy_from_slice(&self.ptr_14.to_le_bytes());
+        bytes[0x14..0x18].copy_from_slice(&self.ptr_unknown1.to_le_bytes());
         bytes
     }
 }
