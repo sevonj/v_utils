@@ -22,8 +22,7 @@ pub const MAX_UKNOWN4_VALUE: usize = 0xffff;
 #[derive(Debug, Clone)]
 pub struct MaterialsDeserialized {
     pub materials: Vec<MaterialDeserialized>,
-    pub mat_unknown3s: Vec<MaterialUnknown3>,
-    pub mat_unknown4s: Vec<i32>,
+    pub mat_unknown3s: Vec<MaterialUnknown3Deserialized>,
 }
 
 impl MaterialsDeserialized {
@@ -171,7 +170,7 @@ impl MaterialsDeserialized {
             }
         }
 
-        let mut mat_unknown3s = Vec::with_capacity(num_mat_unknown3);
+        let mut unk3_headers = Vec::with_capacity(num_mat_unknown3);
         for _ in 0..num_mat_unknown3 {
             let unknown3 = MaterialUnknown3::from_le_unsized(&buf[*data_offset..])?;
             if !material_ids.contains(&unknown3.material_id) {
@@ -180,12 +179,13 @@ impl MaterialsDeserialized {
                     got: unknown3.material_id,
                 });
             }
-            mat_unknown3s.push(unknown3);
+            unk3_headers.push(unknown3);
             *data_offset += size_of::<MaterialUnknown3>();
         }
 
-        let mut mat_unknown4s = vec![];
-        for unk3 in &mat_unknown3s {
+        let mut mat_unknown4s = Vec::with_capacity(unk3_headers.len());
+        for unk3 in &unk3_headers {
+            let mut unk4s = Vec::with_capacity(unk3.num_mat_unk4 as usize);
             for _ in 0..unk3.num_mat_unk4 {
                 let value = read_i32_le(buf, *data_offset);
                 if value as usize > MAX_UKNOWN4_VALUE {
@@ -195,15 +195,21 @@ impl MaterialsDeserialized {
                         got: value as usize,
                     });
                 }
-                mat_unknown4s.push(value);
+                unk4s.push(value);
                 *data_offset += 4;
             }
+            mat_unknown4s.push(unk4s);
         }
+
+        let mat_unknown3s: Vec<MaterialUnknown3Deserialized> = unk3_headers
+            .iter()
+            .zip(mat_unknown4s)
+            .map(|(unk3, unk4s)| MaterialUnknown3Deserialized::new(unk3).with_unknown4s(unk4s))
+            .collect::<Vec<_>>();
 
         Ok(Self {
             materials,
             mat_unknown3s,
-            mat_unknown4s,
         })
     }
 
@@ -305,13 +311,15 @@ impl MaterialsDeserialized {
         }
 
         for unk3 in &self.mat_unknown3s {
-            w.write_all(&unk3.to_le_bytes())?;
+            w.write_all(&unk3.to_header().to_le_bytes())?;
             *data_offset += size_of::<MaterialUnknown3>();
         }
 
-        for unk4 in &self.mat_unknown4s {
-            w.write_all(&unk4.to_le_bytes())?;
-            *data_offset += 4;
+        for unk3 in &self.mat_unknown3s {
+            for unk4 in &unk3.unknown4s {
+                w.write_all(&unk4.to_le_bytes())?;
+                *data_offset += 4;
+            }
         }
 
         Ok(())
@@ -706,6 +714,44 @@ impl MaterialTextureEntry {
         bytes[0x00..0x02].copy_from_slice(&self.index.to_le_bytes());
         bytes[0x02..0x04].copy_from_slice(&self.flags.to_le_bytes());
         bytes
+    }
+}
+
+/// Structured for editability
+#[derive(Debug, Clone)]
+#[repr(C)]
+pub struct MaterialUnknown3Deserialized {
+    pub unk_00: i32,
+    pub material_id: i32,
+    pub unknown4s: Vec<i32>,
+    pub unk_0a: i16,
+    pub ptr_0c: i32,
+}
+
+impl MaterialUnknown3Deserialized {
+    pub fn new(mat: &MaterialUnknown3) -> Self {
+        Self {
+            unk_00: mat.unk_00,
+            material_id: mat.material_id,
+            unknown4s: vec![],
+            unk_0a: mat.unk_0a,
+            ptr_0c: mat.ptr_0c,
+        }
+    }
+
+    pub fn with_unknown4s(mut self, unknown4s: Vec<i32>) -> Self {
+        self.unknown4s = unknown4s;
+        self
+    }
+
+    pub fn to_header(&self) -> MaterialUnknown3 {
+        MaterialUnknown3 {
+            unk_00: self.unk_00,
+            material_id: self.material_id,
+            num_mat_unk4: self.unknown4s.len() as u16,
+            unk_0a: self.unk_0a,
+            ptr_0c: self.ptr_0c,
+        }
     }
 }
 

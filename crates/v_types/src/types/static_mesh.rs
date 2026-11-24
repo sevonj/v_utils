@@ -762,6 +762,44 @@ mod tests {
         assert_eq!(num_success, NUM_CMESH);
     }
 
+    #[cfg(not(feature = "no_gamedata"))]
+    #[test]
+    fn test_cycle_every_cmesh_to_end() {
+        // Unpacked meshes.vpp_pc
+        let samples_path = PathBuf::from("../../samples/meshes_extracted");
+
+        let mut num_failed = 0;
+        for entry in std::fs::read_dir(samples_path).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+
+            if !entry.metadata().unwrap().is_file() || path.extension().unwrap() != "cmesh_pc" {
+                continue;
+            }
+
+            let input_buf = std::fs::read(&path).unwrap();
+            let smesh = StaticMesh::from_data(&input_buf, &mut 0).unwrap();
+
+            let mut out_buf = Vec::with_capacity(input_buf.len());
+            let mut w = BufWriter::new(&mut out_buf);
+
+            smesh.write(&mut w, &mut 0).unwrap();
+            drop(w);
+
+            if out_buf != input_buf {
+                num_failed += 1;
+                println!("ERR: {path:?}");
+                println!(
+                    "exp len: {:X}, got len: {:X}",
+                    input_buf.len(),
+                    out_buf.len()
+                );
+            }
+        }
+        println!("num_failed: {num_failed:?} / {NUM_SMESH:?}");
+        assert_eq!(num_failed, 0);
+    }
+
     // #[test]
     // fn test_static_mesh_size() {
     //     assert_eq!(size_of::<StaticMesh>(), 0x40);
