@@ -30,7 +30,7 @@ impl<'a> MaterialsInspector<'a> {
 impl Widget for MaterialsInspector<'_> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.scope(|ui| {
-            ui.label(format!("Materials: {}", &self.smesh.matlib.materials.len()));
+            ui.label(format!("Materials: {}", self.smesh.matlib.materials.len()));
 
             for (i, mat) in self.smesh.matlib.materials.iter_mut().enumerate() {
                 ui.monospace(format!("Shader id: {:08X}", mat.shader));
